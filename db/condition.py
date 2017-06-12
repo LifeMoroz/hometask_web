@@ -1,0 +1,85 @@
+from datetime import datetime
+
+
+class Logic:
+    def __or__(self, other):
+        new_q = Query()
+        if isinstance(other, Query):
+            new_q.stack.append((self, other, '|'))
+        if isinstance(other, Condition):
+            new_q.stack.append((self, other, '|'))
+        return new_q
+
+    def __and__(self, other):
+        new_q = Query()
+        if isinstance(other, Query):
+            new_q.stack.append((self, other, '&'))
+        if isinstance(other, Condition):
+            new_q.stack.append((self, other, '&'))
+        return new_q
+
+    def sql(self, fields_map=None):
+        raise NotImplementedError
+
+
+class Query(Logic):
+    def __init__(self):
+        self.stack = []
+
+    # noinspection PyMethodMayBeStatic
+    def sql(self, fields_map=None):
+        sql = ''
+        left_params = []
+        right_params = []
+        for left, right, type in self.stack:
+            operator = ' AND ' if type == '&' else ' OR '
+            left_sql, left_params = left.sql(fields_map=fields_map)
+            right_sql, right_params = right.sql(fields_map=fields_map)
+            if not (left_sql or right_sql):
+                return "", []
+            elif not left_sql:
+                return right_sql, right_params
+            elif not right_sql:
+                return left_sql, left_params
+            else:
+                sql = '(' + left_sql + operator + right_sql + ')'
+        return sql, left_params + right_params
+
+    def __str__(self):
+        return self.sql(self.stack)[0]
+
+
+class Condition(Logic):
+    def _get_action_by_value(self, value):
+        if isinstance(value, str):
+            return 'LIKE ?'
+        if hasattr(value, '__iter__'):
+            return 'IN (?)'
+        return '=?'
+
+    def __init__(self, field=None, value=None, action=None):
+        self.field = field
+        self.action = action
+        self.action = self._get_action_by_value(value)
+        if hasattr(value, '__iter__') and not isinstance(value, str):
+            if isinstance(value[0], str):
+                value = '"' + '", "'.join(value) + '"'
+            else:
+                value = ', '.join([str(v) for v in value])
+            self.action = self.action.replace('?', value)
+            self.value = None
+        else:
+            self.value = value
+
+    def sql(self, fields_map=None):
+        if self.field is None:
+            return "", []
+        field = self.field
+        if fields_map:
+            fields = [k for k, v in fields_map.items() if v == self.field]
+            if fields:
+                field = fields[0]
+        if isinstance(self.value, datetime):
+            self.value = self.value.timestamp() * 1000
+        return field + ' ' + self.action, [self.value] if self.value is not None else []
+

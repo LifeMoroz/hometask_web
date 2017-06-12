@@ -1,0 +1,10 @@
+<div class="col-sm-3 col-md-2 sidebar">
+  <ul class="nav nav-sidebar">
+    <li {% if current == 'pc' %}class="active"{% endif %}><a href="{% url 'pc-list' %}">PCs <span class="sr-only">(current)</span></a></li>
+    <li {% if current == 'adapter' %}class="active"{% endif %}><a href="{% url 'adapter-list' %}">Adapters</a></li>
+  <!--
+    <li><a href="#">Connections</a></li>
+    <li><a href="#">Configurations</a></li>
+    -->
+  </ul>
+</div>
